@@ -37,30 +37,42 @@ export default function Qibla() {
       }
     };
 
+    const attachOrientationListener = () => {
+      // Android supporte 'deviceorientationabsolute' qui donne le cap magnétique réel
+      // iOS utilise 'deviceorientation' avec requestPermission
+      // Les autres navigateurs desktop n'ont pas de capteur
+      if ('ondeviceorientationabsolute' in window) {
+        // Android : cap magnétique absolu
+        window.addEventListener('deviceorientationabsolute', handleOrientation as EventListener, true);
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation, true);
+      }
+    };
+
     const requestPermission = async () => {
       try {
-        // Check if requestPermission method exists (iOS 13+)
+        // iOS 13+ : demande de permission explicite
         const DeviceOrientationEventTyped = DeviceOrientationEvent as unknown as {
           requestPermission?: () => Promise<'granted' | 'denied'>;
         };
-        
+
         if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
           const permission = await DeviceOrientationEventTyped.requestPermission();
           if (permission === 'granted') {
-            window.addEventListener('deviceorientation', handleOrientation, true);
+            attachOrientationListener();
           } else {
             setPermissionDenied(true);
             setIsCalibrating(false);
           }
         } else {
-          // Non-iOS devices
-          window.addEventListener('deviceorientation', handleOrientation, true);
+          // Android et autres navigateurs
+          attachOrientationListener();
         }
       } catch (error) {
         console.error('Orientation error:', error);
         setIsCalibrating(false);
-        
-        // Fallback: use random simulation for desktop testing
+
+        // Fallback: simulation pour desktop
         simulateDesktopCompass();
       }
     };
@@ -87,6 +99,7 @@ export default function Qibla() {
       if (calibrationTimeoutRef.current) {
         clearTimeout(calibrationTimeoutRef.current);
       }
+      window.removeEventListener('deviceorientationabsolute', handleOrientation as EventListener, true);
       window.removeEventListener('deviceorientation', handleOrientation, true);
     };
   }, []);

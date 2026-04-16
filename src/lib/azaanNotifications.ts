@@ -4,9 +4,29 @@
  */
 
 import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from './capacitor-local-notifications-shim';
 import azaan1Path from '../data/azaan/1.mp3';
 import azaan2Path from '../data/azaan/2.mp3';
+
+// Utiliser le vrai plugin Capacitor sur native, le shim sur web
+let LocalNotifications: {
+  requestPermissions: () => Promise<{ display: string }>;
+  getPending: () => Promise<{ notifications: Notification[] }>;
+  schedule: (config: unknown) => Promise<void>;
+  cancel: (config: unknown) => Promise<void>;
+};
+
+if (Capacitor.isNativePlatform()) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const cap = require('@capacitor/local-notifications');
+  LocalNotifications = cap.LocalNotifications;
+} else {
+  LocalNotifications = {
+    requestPermissions: async () => ({ display: 'granted' }),
+    getPending: async () => ({ notifications: [] }),
+    schedule: async (config: unknown) => { console.log('Notification (web):', config); },
+    cancel: async (config: unknown) => { console.log('Annulation (web):', config); },
+  };
+}
 
 // Types pour les préférences d'Azaan
 export type AzaanType = 'azaan1' | 'azaan2' | 'disabled';
@@ -28,21 +48,9 @@ interface AzaanNotificationConfig {
  * - Web/Dev: utilise le chemin bundlé par Vite
  * - Android natif: utilise file:///android_asset/...
  */
-function getAudioPath(azaanType: AzaanType): string {
-  if (azaanType === 'disabled') {
-    return '';
-  }
-
-  const fileName = azaanType === 'azaan1' ? '1.mp3' : '2.mp3';
-  const isNativeAndroid = Capacitor.isPluginAvailable('LocalNotifications') && 
-                          Capacitor.getPlatform() === 'android';
-
-  if (isNativeAndroid) {
-    return `file:///android_asset/data/azaan/${fileName}`;
-  }
-
-  // Web/Dev: utiliser le chemin bundlé
-  return azaanType === 'azaan1' ? azaan1Path : azaan2Path;
+function getNotificationSoundName(azaanType: AzaanType): string {
+  // Sur Android, le son doit être le nom du fichier dans res/raw/ (sans extension)
+  return azaanType === 'azaan1' ? 'azaan1' : 'azaan2';
 }
 
 /**
@@ -71,8 +79,10 @@ export async function scheduleAzaanNotification(config: AzaanNotificationConfig)
       return;
     }
 
-    // Déterminer le chemin du fichier audio selon la plateforme
-    const audioPath = getAudioPath(config.azaanType);
+    // Nom du son dans res/raw/ (Android) ou ignoré sur web
+    const audioPath = Capacitor.isNativePlatform()
+      ? getNotificationSoundName(config.azaanType)
+      : '';
 
     // Créer l'ID unique pour cette notification
     const notificationId = `azaan_${config.prayerName}_${config.date.getTime()}`;
@@ -183,9 +193,9 @@ export async function playAzaanPreview(azaanType: AzaanType) {
       return;
     }
 
-    const audioPath = getAudioPath(azaanType);
+    // Toujours utiliser le chemin bundlé par Vite pour la lecture dans la WebView
+    const audioPath = azaanType === 'azaan1' ? azaan1Path : azaan2Path;
 
-    // Créer un élément audio pour la preview
     const audio = new Audio(audioPath);
     audio.volume = 1;
     await audio.play();
