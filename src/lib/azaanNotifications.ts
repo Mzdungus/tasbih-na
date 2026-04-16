@@ -4,29 +4,9 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import azaan1Path from '../data/azaan/1.mp3';
 import azaan2Path from '../data/azaan/2.mp3';
-
-// Utiliser le vrai plugin Capacitor sur native, le shim sur web
-let LocalNotifications: {
-  requestPermissions: () => Promise<{ display: string }>;
-  getPending: () => Promise<{ notifications: Notification[] }>;
-  schedule: (config: unknown) => Promise<void>;
-  cancel: (config: unknown) => Promise<void>;
-};
-
-if (Capacitor.isNativePlatform()) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const cap = require('@capacitor/local-notifications');
-  LocalNotifications = cap.LocalNotifications;
-} else {
-  LocalNotifications = {
-    requestPermissions: async () => ({ display: 'granted' }),
-    getPending: async () => ({ notifications: [] }),
-    schedule: async (config: unknown) => { console.log('Notification (web):', config); },
-    cancel: async (config: unknown) => { console.log('Annulation (web):', config); },
-  };
-}
 
 // Types pour les préférences d'Azaan
 export type AzaanType = 'azaan1' | 'azaan2' | 'disabled';
